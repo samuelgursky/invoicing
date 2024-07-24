@@ -22,6 +22,8 @@ function exportSelectedRowToPDF() {
     website: "www. Your Website .com"
   };
 
+  const logoFileId = 'your-logo-file-id'; // Replace with your logo file ID from Google Drive
+
   const achRemittanceInfo = {
     bankName: "Bank",
     accountNumber: "#",
@@ -64,7 +66,7 @@ function exportSelectedRowToPDF() {
     let serviceQuantity = [service1Quantity, service2Quantity, service3Quantity, service4Quantity, service5Quantity][i] || 0;
 
     serviceFee = parseFloat(serviceFee);
-    serviceQuantity = parseInt(serviceQuantity, 10) || (serviceListed.trim() ? 1 : 0);
+    serviceQuantity = parseFloat(serviceQuantity) || (serviceListed.trim() ? 1 : 0);
 
     if (serviceListed.trim() !== '') {
       services.push({
@@ -90,6 +92,28 @@ function exportSelectedRowToPDF() {
   body.setMarginBottom(72);
   body.setMarginLeft(72);
   body.setMarginRight(72);
+
+  // Add Logo Image
+  try {
+    const logo = DriveApp.getFileById(logoFileId).getBlob();
+    const logoParagraph = body.appendParagraph('');
+    const logoImage = logoParagraph.appendInlineImage(logo);
+    
+    // Maintain aspect ratio and set maximum width
+    const maxWidth = 150; // Adjust the maximum width as needed
+    const logoWidth = logoImage.getWidth();
+    const logoHeight = logoImage.getHeight();
+    const aspectRatio = logoHeight / logoWidth;
+
+    logoImage.setWidth(maxWidth);
+    logoImage.setHeight(maxWidth * aspectRatio);
+    logoParagraph.setAlignment(DocumentApp.HorizontalAlignment.CENTER);
+    
+    body.appendParagraph("").setSpacingAfter(20);
+  } catch (e) {
+    logoError = true;
+    Logger.log('Error fetching logo: ' + e.message);
+  }
 
   // Document Header
   body.appendParagraph(companyInfo.name)
@@ -176,9 +200,15 @@ function exportSelectedRowToPDF() {
   pdfFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
   const pdfUrl = pdfFile.getUrl();
 
-  const htmlOutput = HtmlService.createHtmlOutput(`<html><body><p>Invoice PDF generated successfully. Version: ${version}. <a href="${pdfUrl}" target="_blank" rel="noopener noreferrer">Click here to view and download your Invoice PDF</a>.</p></body></html>`)
+  let htmlContent = `<html><body><p>Invoice PDF generated successfully. <p>Version: ${version}. <p><a href="${pdfUrl}" target="_blank" rel="noopener noreferrer">Click here to view and download your Invoice PDF</a>.</p>`;
+  if (logoError) {
+    htmlContent += `<p>Note: The logo image could not be included due to an error with the file ID.</p>`;
+  }
+  htmlContent += `</body></html>`;
+
+  const htmlOutput = HtmlService.createHtmlOutput(htmlContent)
                                 .setWidth(300)
-                                .setHeight(100);
+                                .setHeight(200);
   SpreadsheetApp.getUi().showModalDialog(htmlOutput, 'Invoice PDF Download');
   DriveApp.getFileById(doc.getId()).setTrashed(true);
 }
